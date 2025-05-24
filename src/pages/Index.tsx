@@ -5,6 +5,7 @@ import DashboardOverview from '@/components/DashboardOverview';
 import KnowledgeBaseManager from '@/components/KnowledgeBaseManager';
 import UserManagement from '@/components/UserManagement';
 import SystemConfig from '@/components/SystemConfig';
+import ChatInterface from '@/components/ChatInterface';
 
 const Index = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -18,14 +19,7 @@ const Index = () => {
       case 'users':
         return <UserManagement />;
       case 'chats':
-        return (
-          <div className="flex items-center justify-center h-64 bg-white/60 backdrop-blur-sm rounded-lg border-0 shadow-lg">
-            <div className="text-center">
-              <h3 className="text-xl font-semibold text-slate-800 mb-2">Chat Sessions</h3>
-              <p className="text-slate-600">Chat session monitoring coming soon...</p>
-            </div>
-          </div>
-        );
+        return <ChatInterface />;
       case 'settings':
         return <SystemConfig />;
       default:
