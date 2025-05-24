@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { usePinecone } from '@/hooks/usePinecone';
+import { documentParsingService } from '@/services/documentParsingService';
 import VectorStatsCard from '@/components/VectorStatsCard';
 import DocumentUpload from '@/components/DocumentUpload';
 import CategorySidebar from '@/components/CategorySidebar';
@@ -121,11 +122,18 @@ const KnowledgeBaseManager = () => {
   };
 
   const extractTextFromFile = async (file: File): Promise<string> => {
-    if (file.type === 'text/plain' || file.type === 'text/markdown') {
-      return await file.text();
+    try {
+      const parsedDocument = await documentParsingService.parseDocument(file);
+      console.log('Document parsed successfully:', parsedDocument.metadata);
+      return parsedDocument.text;
+    } catch (error) {
+      console.error('Error parsing document:', error);
+      // Fallback to simple text extraction
+      if (file.type === 'text/plain' || file.type === 'text/markdown') {
+        return await file.text();
+      }
+      return `This is extracted text from ${file.name}. Enhanced document parsing failed, using fallback extraction.`;
     }
-    
-    return `This is extracted text from ${file.name}. In a real implementation, you would use appropriate libraries to extract text from PDF, DOC, and other file formats. The content would include all the actual text from the document that can be processed and indexed in the vector database.`;
   };
 
   const simulateFileUpload = useCallback(async (uploadFile: UploadFile) => {

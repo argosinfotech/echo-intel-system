@@ -1,12 +1,14 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, BookOpen, Database, Search } from 'lucide-react';
+import { Send, Bot, User, BookOpen, Database, Search, Brain, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { usePinecone } from '@/hooks/usePinecone';
+import { queryProcessingService } from '@/services/queryProcessingService';
+import { googleAIService } from '@/services/googleAIService';
+import { responseFilteringService } from '@/services/responseFilteringService';
 
 interface Message {
   id: string;
@@ -47,22 +49,44 @@ const KnowledgeBaseChat = () => {
     scrollToBottom();
   }, [messages]);
 
-  const generateAIResponse = (query: string, searchResults: any[]): string => {
+  const generateAIResponse = async (query: string, searchResults: any[]): Promise<string> => {
     if (searchResults.length === 0) {
       return `I couldn't find any relevant documents for "${query}". You might want to try rephrasing your question or check if the relevant documents have been uploaded to the knowledge base.`;
     }
 
-    const topResult = searchResults[0];
-    const relevantContent = searchResults
+    // Use Google AI to generate a contextual response
+    const context = searchResults
       .slice(0, 3)
-      .map(result => result.text.substring(0, 200))
-      .join('... ');
+      .map(result => result.text)
+      .join('\n\n');
 
-    return `Based on the relevant documents I found, here's what I can tell you about "${query}":
+    try {
+      const aiResponse = await googleAIService.generateResponse(query, context);
+      
+      // Filter the response for appropriateness and relevance
+      const filteredResponse = responseFilteringService.filterResponse(
+        aiResponse, 
+        query, 
+        searchResults.map(r => r.text)
+      );
 
-${relevantContent}...
+      // Enhance with metadata if needed
+      const sources = searchResults.slice(0, 3).map(result => ({
+        filename: result.filename,
+        score: result.score,
+        category: result.category
+      }));
 
-This information comes from ${searchResults.length} relevant document${searchResults.length > 1 ? 's' : ''} in our knowledge base. The most relevant source is "${topResult.filename}" with a ${(topResult.score * 100).toFixed(1)}% similarity match.`;
+      return responseFilteringService.enhanceResponseWithMetadata(filteredResponse, sources);
+      
+    } catch (error) {
+      console.error('Error generating AI response:', error);
+      return `Based on the relevant documents I found, here's what I can tell you about "${query}":
+
+${searchResults[0].text.substring(0, 300)}...
+
+This information comes from ${searchResults.length} relevant document${searchResults.length > 1 ? 's' : ''} in our knowledge base.`;
+    }
   };
 
   const handleSendMessage = async () => {
@@ -81,11 +105,18 @@ This information comes from ${searchResults.length} relevant document${searchRes
     setIsTyping(true);
 
     try {
+      // Analyze the query for better search
+      const queryAnalysis = queryProcessingService.analyzeQuery(query);
+      console.log('Query analysis:', queryAnalysis);
+      
+      // Build enhanced search query
+      const searchQuery = queryProcessingService.buildSearchQuery(queryAnalysis);
+      
       // Search in Pinecone vector database
-      const searchResults = await searchDocuments(query, 5);
+      const searchResults = await searchDocuments(searchQuery, 5);
       
       // Generate AI response based on search results
-      const aiResponse = generateAIResponse(query, searchResults.matches);
+      const aiResponse = await generateAIResponse(query, searchResults.matches);
       
       // Create sources from search results
       const sources = searchResults.matches.slice(0, 3).map(match => ({
@@ -134,7 +165,10 @@ This information comes from ${searchResults.length} relevant document${searchRes
           <p className="text-gray-600 flex items-center justify-center space-x-2">
             <Database className="w-4 h-4 text-purple-500" />
             <span>Powered by Pinecone vector search</span>
-            <Search className="w-4 h-4 text-blue-500" />
+            <Brain className="w-4 h-4 text-green-500" />
+            <span>Google AI (Gemini)</span>
+            <Filter className="w-4 h-4 text-blue-500" />
+            <span>Smart filtering</span>
           </p>
         </div>
 
@@ -142,9 +176,9 @@ This information comes from ${searchResults.length} relevant document${searchRes
           <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-lg">
             <CardTitle className="flex items-center space-x-2">
               <BookOpen className="h-5 w-5" />
-              <span>Semantic Search Chat</span>
+              <span>Enhanced Semantic Search Chat</span>
               <Badge variant="secondary" className="bg-white/20 text-white">
-                Vector DB
+                Vector DB + AI
               </Badge>
             </CardTitle>
           </CardHeader>

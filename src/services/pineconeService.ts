@@ -1,5 +1,6 @@
-
 import { Pinecone } from '@pinecone-database/pinecone';
+import { googleAIService } from './googleAIService';
+import { documentParsingService } from './documentParsingService';
 
 export interface DocumentChunk {
   id: string;
@@ -62,33 +63,21 @@ class PineconeService {
     }
   }
 
-  // Generate embeddings using OpenAI (you'll need to implement this)
   private async generateEmbeddings(text: string): Promise<number[]> {
-    // This is a placeholder - you'll need to integrate with OpenAI's embedding API
-    // For now, returning mock embeddings
-    console.log('Generating embeddings for text:', text.substring(0, 100) + '...');
-    
-    // Mock embedding - in production, use OpenAI's text-embedding-ada-002
-    return Array.from({ length: 1536 }, () => Math.random() - 0.5);
-  }
-
-  // Chunk document into smaller pieces
-  private chunkDocument(text: string, chunkSize: number = 1000, overlap: number = 200): string[] {
-    const chunks: string[] = [];
-    let start = 0;
-
-    while (start < text.length) {
-      const end = Math.min(start + chunkSize, text.length);
-      chunks.push(text.slice(start, end));
-      start = end - overlap;
-      
-      if (start >= text.length) break;
+    try {
+      return await googleAIService.generateEmbedding(text);
+    } catch (error) {
+      console.error('Error generating embeddings with Google AI:', error);
+      // Fallback to mock embeddings
+      console.log('Falling back to mock embeddings');
+      return Array.from({ length: 768 }, () => Math.random() - 0.5);
     }
-
-    return chunks;
   }
 
-  // Store document embeddings in Pinecone
+  private chunkDocument(text: string, chunkSize: number = 1000, overlap: number = 200): string[] {
+    return documentParsingService.chunkText(text, chunkSize, overlap);
+  }
+
   async storeDocumentEmbeddings(
     documentText: string,
     filename: string,
@@ -137,7 +126,6 @@ class PineconeService {
     }
   }
 
-  // Search for similar documents/chunks
   async searchSimilarDocuments(
     query: string,
     topK: number = 5,
@@ -188,7 +176,6 @@ class PineconeService {
     }
   }
 
-  // Delete document embeddings
   async deleteDocumentEmbeddings(documentId: string): Promise<boolean> {
     try {
       if (!this.index) {
@@ -211,7 +198,6 @@ class PineconeService {
     }
   }
 
-  // Get document statistics
   async getIndexStats(): Promise<{
     totalVectors: number;
     dimension: number;
