@@ -1,11 +1,6 @@
 
 import { Pinecone } from '@pinecone-database/pinecone';
 
-// Initialize Pinecone client
-const pinecone = new Pinecone({
-  apiKey: import.meta.env.VITE_PINECONE_API_KEY || '',
-});
-
 export interface DocumentChunk {
   id: string;
   text: string;
@@ -34,19 +29,36 @@ export interface DocumentEmbedding {
 class PineconeService {
   private indexName: string;
   private index: any;
+  private pinecone: Pinecone | null = null;
 
   constructor(indexName: string = 'knowledge-base') {
     this.indexName = indexName;
-    this.initializeIndex();
+  }
+
+  private initializePinecone() {
+    if (this.pinecone) return this.pinecone;
+
+    const apiKey = import.meta.env.VITE_PINECONE_API_KEY;
+    
+    if (!apiKey) {
+      throw new Error(
+        'Pinecone API key is required. Please set VITE_PINECONE_API_KEY in your environment variables. ' +
+        'You can find your API key in the Pinecone developer console at https://app.pinecone.io'
+      );
+    }
+
+    this.pinecone = new Pinecone({ apiKey });
+    return this.pinecone;
   }
 
   private async initializeIndex() {
     try {
+      const pinecone = this.initializePinecone();
       this.index = pinecone.index(this.indexName);
       console.log(`Connected to Pinecone index: ${this.indexName}`);
     } catch (error) {
       console.error('Error initializing Pinecone index:', error);
-      throw new Error('Failed to initialize Pinecone index');
+      throw error;
     }
   }
 
