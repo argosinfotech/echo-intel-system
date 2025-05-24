@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,7 +15,7 @@ import {
   FolderPlus,
   Calendar,
   User,
-  FileSize
+  File
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -242,7 +241,7 @@ const KnowledgeBaseManager = () => {
                             <Badge variant="outline">{doc.category}</Badge>
                           </span>
                           <span className="flex items-center">
-                            <FileSize className="w-4 h-4 mr-1" />
+                            <File className="w-4 h-4 mr-1" />
                             {doc.size}
                           </span>
                           <span className="flex items-center">
