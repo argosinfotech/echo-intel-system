@@ -51,6 +51,7 @@ const SystemConfig = () => {
     maxTokens: '2048',
     model: 'gpt-4o-mini',
     systemPrompt: '',
+    botInstructions: '',
     enableStreaming: true,
     topP: '0.9',
     frequencyPenalty: '0',
@@ -462,6 +463,17 @@ const SystemConfig = () => {
                   placeholder="Enter the system prompt that will be used for AI responses..."
                   value={llmSettings.systemPrompt}
                   onChange={(e) => setLlmSettings({...llmSettings, systemPrompt: e.target.value})}
+                  rows={4}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="botInstructions">Bot Instructions</Label>
+                <Textarea
+                  id="botInstructions"
+                  placeholder="Enter specific instructions for how the bot should behave and respond..."
+                  value={llmSettings.botInstructions}
+                  onChange={(e) => setLlmSettings({...llmSettings, botInstructions: e.target.value})}
                   rows={4}
                 />
               </div>
