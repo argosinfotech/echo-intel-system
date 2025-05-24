@@ -1,13 +1,48 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import React, { useState } from 'react';
+import AdminLayout from '@/components/AdminLayout';
+import DashboardOverview from '@/components/DashboardOverview';
+import KnowledgeBaseManager from '@/components/KnowledgeBaseManager';
+import UserManagement from '@/components/UserManagement';
 
 const Index = () => {
+  const [currentPage, setCurrentPage] = useState('dashboard');
+
+  const renderCurrentPage = () => {
+    switch (currentPage) {
+      case 'dashboard':
+        return <DashboardOverview />;
+      case 'knowledge':
+        return <KnowledgeBaseManager />;
+      case 'users':
+        return <UserManagement />;
+      case 'chats':
+        return (
+          <div className="flex items-center justify-center h-64 bg-white/60 backdrop-blur-sm rounded-lg border-0 shadow-lg">
+            <div className="text-center">
+              <h3 className="text-xl font-semibold text-slate-800 mb-2">Chat Sessions</h3>
+              <p className="text-slate-600">Chat session monitoring coming soon...</p>
+            </div>
+          </div>
+        );
+      case 'settings':
+        return (
+          <div className="flex items-center justify-center h-64 bg-white/60 backdrop-blur-sm rounded-lg border-0 shadow-lg">
+            <div className="text-center">
+              <h3 className="text-xl font-semibold text-slate-800 mb-2">System Configuration</h3>
+              <p className="text-slate-600">System settings panel coming soon...</p>
+            </div>
+          </div>
+        );
+      default:
+        return <DashboardOverview />;
+    }
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
-      </div>
-    </div>
+    <AdminLayout currentPage={currentPage} onPageChange={setCurrentPage}>
+      {renderCurrentPage()}
+    </AdminLayout>
   );
 };
 
