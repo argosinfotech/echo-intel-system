@@ -1,23 +1,30 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, BookOpen } from 'lucide-react';
+import { Send, Bot, User, BookOpen, Database, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { usePinecone } from '@/hooks/usePinecone';
 
 interface Message {
   id: string;
   content: string;
   sender: 'user' | 'bot';
   timestamp: Date;
+  sources?: Array<{
+    filename: string;
+    category: string;
+    score: number;
+  }>;
 }
 
 const KnowledgeBaseChat = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: 'Hello! I\'m your knowledge base assistant. Ask me anything about our documentation and I\'ll help you find the information you need.',
+      content: 'Hello! I\'m your AI-powered knowledge base assistant. I can search through your documents using advanced vector similarity to find the most relevant information. Ask me anything!',
       sender: 'bot',
       timestamp: new Date(),
     }
@@ -25,6 +32,7 @@ const KnowledgeBaseChat = () => {
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const { searchDocuments, isSearching } = usePinecone();
 
   const scrollToBottom = () => {
     if (scrollAreaRef.current) {
@@ -39,6 +47,24 @@ const KnowledgeBaseChat = () => {
     scrollToBottom();
   }, [messages]);
 
+  const generateAIResponse = (query: string, searchResults: any[]): string => {
+    if (searchResults.length === 0) {
+      return `I couldn't find any relevant documents for "${query}". You might want to try rephrasing your question or check if the relevant documents have been uploaded to the knowledge base.`;
+    }
+
+    const topResult = searchResults[0];
+    const relevantContent = searchResults
+      .slice(0, 3)
+      .map(result => result.text.substring(0, 200))
+      .join('... ');
+
+    return `Based on the relevant documents I found, here's what I can tell you about "${query}":
+
+${relevantContent}...
+
+This information comes from ${searchResults.length} relevant document${searchResults.length > 1 ? 's' : ''} in our knowledge base. The most relevant source is "${topResult.filename}" with a ${(topResult.score * 100).toFixed(1)}% similarity match.`;
+  };
+
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
 
@@ -50,20 +76,48 @@ const KnowledgeBaseChat = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const query = inputValue;
     setInputValue('');
     setIsTyping(true);
 
-    // Simulate knowledge base response
-    setTimeout(() => {
+    try {
+      // Search in Pinecone vector database
+      const searchResults = await searchDocuments(query, 5);
+      
+      // Generate AI response based on search results
+      const aiResponse = generateAIResponse(query, searchResults.matches);
+      
+      // Create sources from search results
+      const sources = searchResults.matches.slice(0, 3).map(match => ({
+        filename: match.filename,
+        category: match.category,
+        score: match.score,
+      }));
+
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: `I found information related to "${userMessage.content}". Here's what I can tell you: This is a simulated response from the knowledge base. You can integrate this with your actual knowledge base search and AI response system.`,
+        content: aiResponse,
+        sender: 'bot',
+        timestamp: new Date(),
+        sources: sources.length > 0 ? sources : undefined,
+      };
+
+      setMessages(prev => [...prev, botMessage]);
+      
+    } catch (error) {
+      console.error('Error searching knowledge base:', error);
+      
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: 'I apologize, but I encountered an error while searching the knowledge base. Please try again or contact support if the problem persists.',
         sender: 'bot',
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, botMessage]);
+      
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsTyping(false);
-    }, 2000);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -76,15 +130,22 @@ const KnowledgeBaseChat = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Knowledge Base Assistant</h1>
-          <p className="text-gray-600">Ask questions and get instant answers from our knowledge base</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">AI Knowledge Base Assistant</h1>
+          <p className="text-gray-600 flex items-center justify-center space-x-2">
+            <Database className="w-4 h-4 text-purple-500" />
+            <span>Powered by Pinecone vector search</span>
+            <Search className="w-4 h-4 text-blue-500" />
+          </p>
         </div>
 
         <Card className="h-[600px] flex flex-col shadow-lg">
           <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-lg">
             <CardTitle className="flex items-center space-x-2">
               <BookOpen className="h-5 w-5" />
-              <span>Chat with Knowledge Base</span>
+              <span>Semantic Search Chat</span>
+              <Badge variant="secondary" className="bg-white/20 text-white">
+                Vector DB
+              </Badge>
             </CardTitle>
           </CardHeader>
           
@@ -92,51 +153,83 @@ const KnowledgeBaseChat = () => {
             <ScrollArea ref={scrollAreaRef} className="flex-1 pr-4">
               <div className="space-y-4">
                 {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex items-start space-x-3 ${
-                      message.sender === 'user' ? 'justify-end' : 'justify-start'
-                    }`}
-                  >
-                    {message.sender === 'bot' && (
-                      <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
-                        <Bot className="h-4 w-4 text-white" />
-                      </div>
-                    )}
-                    
+                  <div key={message.id} className="space-y-2">
                     <div
-                      className={`max-w-[80%] rounded-lg px-4 py-3 ${
-                        message.sender === 'user'
-                          ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white'
-                          : 'bg-gray-100 text-gray-900'
+                      className={`flex items-start space-x-3 ${
+                        message.sender === 'user' ? 'justify-end' : 'justify-start'
                       }`}
                     >
-                      <p className="text-sm leading-relaxed">{message.content}</p>
-                      <p className={`text-xs mt-2 ${
-                        message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'
-                      }`}>
-                        {message.timestamp.toLocaleTimeString()}
-                      </p>
+                      {message.sender === 'bot' && (
+                        <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
+                          <Bot className="h-4 w-4 text-white" />
+                        </div>
+                      )}
+                      
+                      <div
+                        className={`max-w-[80%] rounded-lg px-4 py-3 ${
+                          message.sender === 'user'
+                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white'
+                            : 'bg-gray-100 text-gray-900'
+                        }`}
+                      >
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                        <p className={`text-xs mt-2 ${
+                          message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'
+                        }`}>
+                          {message.timestamp.toLocaleTimeString()}
+                        </p>
+                      </div>
+
+                      {message.sender === 'user' && (
+                        <div className="flex-shrink-0 w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center">
+                          <User className="h-4 w-4 text-white" />
+                        </div>
+                      )}
                     </div>
 
-                    {message.sender === 'user' && (
-                      <div className="flex-shrink-0 w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center">
-                        <User className="h-4 w-4 text-white" />
+                    {/* Sources */}
+                    {message.sources && message.sources.length > 0 && (
+                      <div className="ml-11 space-y-2">
+                        <p className="text-xs font-medium text-gray-600">Sources:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {message.sources.map((source, index) => (
+                            <div
+                              key={index}
+                              className="bg-white border rounded-lg px-3 py-2 text-xs"
+                            >
+                              <div className="flex items-center space-x-2">
+                                <Database className="w-3 h-3 text-purple-500" />
+                                <span className="font-medium truncate max-w-32">
+                                  {source.filename}
+                                </span>
+                                <Badge variant="outline" className="text-xs">
+                                  {(source.score * 100).toFixed(0)}%
+                                </Badge>
+                              </div>
+                              <p className="text-gray-500 mt-1">{source.category}</p>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
                 ))}
                 
-                {isTyping && (
+                {(isTyping || isSearching) && (
                   <div className="flex items-start space-x-3">
                     <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
                       <Bot className="h-4 w-4 text-white" />
                     </div>
                     <div className="bg-gray-100 rounded-lg px-4 py-3">
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="flex items-center space-x-2">
+                        <div className="flex space-x-1">
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        </div>
+                        <span className="text-xs text-gray-500">
+                          {isSearching ? 'Searching vector database...' : 'Thinking...'}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -149,12 +242,13 @@ const KnowledgeBaseChat = () => {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Ask a question about our knowledge base..."
+                placeholder="Ask me anything about your knowledge base..."
                 className="flex-1"
+                disabled={isTyping || isSearching}
               />
               <Button 
                 onClick={handleSendMessage} 
-                disabled={!inputValue.trim() || isTyping}
+                disabled={!inputValue.trim() || isTyping || isSearching}
                 className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
               >
                 <Send className="h-4 w-4" />

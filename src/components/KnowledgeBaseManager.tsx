@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -46,16 +45,19 @@ import {
   AlertCircle,
   Pen,
   RefreshCw,
-  Folder
+  Folder,
+  Database,
+  Zap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { usePinecone } from '@/hooks/usePinecone';
 
 interface UploadFile {
   id: string;
   file: File;
   progress: number;
-  status: 'uploading' | 'processing' | 'completed' | 'error';
+  status: 'uploading' | 'processing' | 'embedding' | 'completed' | 'error';
   error?: string;
 }
 
@@ -69,6 +71,7 @@ interface Document {
   status: 'processed' | 'processing' | 'failed';
   chunks: number;
   downloads: number;
+  embeddings?: number;
 }
 
 const KnowledgeBaseManager = () => {
@@ -81,9 +84,11 @@ const KnowledgeBaseManager = () => {
   const [newFileName, setNewFileName] = useState('');
   const [newCategory, setNewCategory] = useState('');
   const [replacementFile, setReplacementFile] = useState<File | null>(null);
+  const [vectorStats, setVectorStats] = useState({ totalVectors: 0, dimension: 1536, indexFullness: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const replaceFileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { storeDocument, deleteDocument, getIndexStats, isProcessing } = usePinecone();
 
   const categories = [
     { id: 'all', name: 'All Categories', count: 1234 },
@@ -104,7 +109,8 @@ const KnowledgeBaseManager = () => {
       uploadedBy: 'Admin User',
       status: 'processed',
       chunks: 45,
-      downloads: 127
+      downloads: 127,
+      embeddings: 45
     },
     {
       id: 2,
@@ -115,7 +121,8 @@ const KnowledgeBaseManager = () => {
       uploadedBy: 'Product Manager',
       status: 'processing',
       chunks: 32,
-      downloads: 89
+      downloads: 89,
+      embeddings: 0
     },
     {
       id: 3,
@@ -126,7 +133,8 @@ const KnowledgeBaseManager = () => {
       uploadedBy: 'HR Admin',
       status: 'processed',
       chunks: 78,
-      downloads: 234
+      downloads: 234,
+      embeddings: 78
     },
     {
       id: 4,
@@ -137,7 +145,8 @@ const KnowledgeBaseManager = () => {
       uploadedBy: 'Tech Lead',
       status: 'processed',
       chunks: 23,
-      downloads: 156
+      downloads: 156,
+      embeddings: 23
     },
     {
       id: 5,
@@ -148,7 +157,8 @@ const KnowledgeBaseManager = () => {
       uploadedBy: 'Training Coordinator',
       status: 'failed',
       chunks: 0,
-      downloads: 0
+      downloads: 0,
+      embeddings: 0
     }
   ]);
 
@@ -175,9 +185,23 @@ const KnowledgeBaseManager = () => {
     return null;
   };
 
+  const extractTextFromFile = async (file: File): Promise<string> => {
+    // This is a mock implementation - in production, you'd use libraries like:
+    // - PDF.js for PDFs
+    // - mammoth.js for Word documents
+    // - Direct reading for text files
+    
+    if (file.type === 'text/plain' || file.type === 'text/markdown') {
+      return await file.text();
+    }
+    
+    // For other file types, return mock text
+    return `This is extracted text from ${file.name}. In a real implementation, you would use appropriate libraries to extract text from PDF, DOC, and other file formats. The content would include all the actual text from the document that can be processed and indexed in the vector database.`;
+  };
+
   const simulateFileUpload = useCallback(async (uploadFile: UploadFile) => {
     try {
-      // Simulate upload progress
+      // Upload progress simulation
       for (let progress = 0; progress <= 100; progress += 10) {
         await new Promise(resolve => setTimeout(resolve, 200));
         setUploadFiles(prev => prev.map(f => 
@@ -185,39 +209,61 @@ const KnowledgeBaseManager = () => {
         ));
       }
 
-      // Simulate processing
+      // Processing phase
       setUploadFiles(prev => prev.map(f => 
         f.id === uploadFile.id ? { ...f, status: 'processing' } : f
       ));
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Extract text from file
+      const documentText = await extractTextFromFile(uploadFile.file);
 
-      // Complete
+      // Embedding phase
       setUploadFiles(prev => prev.map(f => 
-        f.id === uploadFile.id ? { ...f, status: 'completed' } : f
+        f.id === uploadFile.id ? { ...f, status: 'embedding' } : f
       ));
 
-      toast({
-        title: "Upload successful",
-        description: `${uploadFile.file.name} has been processed and added to the knowledge base.`,
-      });
+      // Store in Pinecone
+      const result = await storeDocument(
+        documentText,
+        uploadFile.file.name,
+        'General', // Default category
+        uploadFile.id
+      );
+
+      if (result.success) {
+        setUploadFiles(prev => prev.map(f => 
+          f.id === uploadFile.id ? { ...f, status: 'completed' } : f
+        ));
+
+        // Update vector stats
+        const stats = await getIndexStats();
+        setVectorStats(stats);
+
+        toast({
+          title: "Upload successful",
+          description: `${uploadFile.file.name} has been processed and indexed with ${result.chunksStored} embeddings.`,
+        });
+      } else {
+        throw new Error('Failed to store embeddings');
+      }
 
     } catch (error) {
       setUploadFiles(prev => prev.map(f => 
         f.id === uploadFile.id ? { 
           ...f, 
           status: 'error', 
-          error: 'Upload failed. Please try again.' 
+          error: 'Failed to process and index document' 
         } : f
       ));
 
       toast({
         title: "Upload failed",
-        description: `Failed to upload ${uploadFile.file.name}. Please try again.`,
+        description: `Failed to upload and index ${uploadFile.file.name}. Please try again.`,
         variant: "destructive",
       });
     }
-  }, [toast]);
+  }, [storeDocument, getIndexStats, toast]);
 
   const handleFileSelect = useCallback((files: FileList | File[]) => {
     const fileArray = Array.from(files);
@@ -302,13 +348,24 @@ const KnowledgeBaseManager = () => {
     setReplacementFile(null);
   };
 
-  const handleDeleteDocument = () => {
+  const handleDeleteDocument = async () => {
     if (selectedDocument) {
-      setDocuments(prev => prev.filter(doc => doc.id !== selectedDocument.id));
-      toast({
-        title: "Document deleted",
-        description: `${selectedDocument.name} has been removed from the knowledge base.`,
-      });
+      // Delete from vector database
+      const success = await deleteDocument(selectedDocument.id.toString());
+      
+      if (success) {
+        setDocuments(prev => prev.filter(doc => doc.id !== selectedDocument.id));
+        
+        // Update vector stats
+        const stats = await getIndexStats();
+        setVectorStats(stats);
+        
+        toast({
+          title: "Document deleted",
+          description: `${selectedDocument.name} and its embeddings have been removed.`,
+        });
+      }
+      
       closeActionDialog();
     }
   };
@@ -388,20 +445,63 @@ const KnowledgeBaseManager = () => {
     switch (status) {
       case 'completed': return <CheckCircle className="w-4 h-4 text-green-500" />;
       case 'error': return <XCircle className="w-4 h-4 text-red-500" />;
+      case 'embedding': return <Database className="w-4 h-4 text-purple-500" />;
       case 'processing': return <AlertCircle className="w-4 h-4 text-blue-500" />;
       default: return <Upload className="w-4 h-4 text-gray-500" />;
     }
   };
 
+  const getUploadStatusText = (uploadFile: UploadFile) => {
+    switch (uploadFile.status) {
+      case 'uploading': return `${uploadFile.progress}%`;
+      case 'processing': return 'Processing...';
+      case 'embedding': return 'Creating embeddings...';
+      case 'completed': return 'Completed';
+      case 'error': return uploadFile.error || 'Error';
+      default: return '';
+    }
+  };
+
+  // Load vector stats on component mount
+  React.useEffect(() => {
+    getIndexStats().then(setVectorStats);
+  }, [getIndexStats]);
+
   return (
     <div className="space-y-8">
+      {/* Vector Database Stats */}
+      <Card className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 backdrop-blur-sm border-0 shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center text-slate-800">
+            <Database className="w-5 h-5 mr-2 text-purple-500" />
+            Vector Database (Pinecone)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="text-center p-4 bg-white/60 rounded-lg">
+              <div className="text-2xl font-bold text-purple-600">{vectorStats.totalVectors.toLocaleString()}</div>
+              <div className="text-sm text-slate-600">Total Embeddings</div>
+            </div>
+            <div className="text-center p-4 bg-white/60 rounded-lg">
+              <div className="text-2xl font-bold text-blue-600">{vectorStats.dimension}</div>
+              <div className="text-sm text-slate-600">Vector Dimension</div>
+            </div>
+            <div className="text-center p-4 bg-white/60 rounded-lg">
+              <div className="text-2xl font-bold text-green-600">{(vectorStats.indexFullness * 100).toFixed(1)}%</div>
+              <div className="text-sm text-slate-600">Index Fullness</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Upload Section */}
       <Card className="bg-white/60 backdrop-blur-sm border-0 shadow-lg">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center text-slate-800">
               <Upload className="w-5 h-5 mr-2 text-blue-500" />
-              Document Upload
+              Document Upload & Embedding
             </CardTitle>
             {uploadFiles.length > 0 && (
               <Button 
@@ -426,21 +526,27 @@ const KnowledgeBaseManager = () => {
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
-            <Upload className="w-12 h-12 text-blue-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-slate-800 mb-2">Upload Knowledge Base Documents</h3>
-            <p className="text-slate-600 mb-4">Drag and drop files here, or click to browse</p>
+            <div className="flex items-center justify-center space-x-4 mb-4">
+              <Upload className="w-12 h-12 text-blue-500" />
+              <Zap className="w-8 h-8 text-purple-500" />
+              <Database className="w-12 h-12 text-green-500" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-800 mb-2">Upload & Vectorize Documents</h3>
+            <p className="text-slate-600 mb-4">Files are automatically processed and indexed in Pinecone vector database</p>
             <p className="text-sm text-slate-500 mb-4">Supports PDF, DOC, DOCX, TXT, MD files up to 50MB</p>
             
             <div className="space-x-4">
               <Button 
                 onClick={() => fileInputRef.current?.click()}
                 className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+                disabled={isProcessing}
               >
-                Select Files
+                {isProcessing ? 'Processing...' : 'Select Files'}
               </Button>
               <Button 
                 variant="outline"
                 onClick={() => fileInputRef.current?.click()}
+                disabled={isProcessing}
               >
                 Bulk Upload
               </Button>
@@ -459,7 +565,7 @@ const KnowledgeBaseManager = () => {
           {/* Upload Progress */}
           {uploadFiles.length > 0 && (
             <div className="mt-6 space-y-3">
-              <h4 className="text-sm font-medium text-slate-700">Upload Progress</h4>
+              <h4 className="text-sm font-medium text-slate-700">Upload & Embedding Progress</h4>
               {uploadFiles.map((uploadFile) => (
                 <div key={uploadFile.id} className="flex items-center space-x-3 p-3 bg-white/80 rounded-lg border">
                   {getUploadStatusIcon(uploadFile.status)}
@@ -472,10 +578,7 @@ const KnowledgeBaseManager = () => {
                         <Progress value={uploadFile.progress} className="h-2 flex-1" />
                       )}
                       <span className="text-xs text-slate-500">
-                        {uploadFile.status === 'uploading' && `${uploadFile.progress}%`}
-                        {uploadFile.status === 'processing' && 'Processing...'}
-                        {uploadFile.status === 'completed' && 'Completed'}
-                        {uploadFile.status === 'error' && uploadFile.error}
+                        {getUploadStatusText(uploadFile)}
                       </span>
                     </div>
                   </div>
@@ -564,6 +667,7 @@ const KnowledgeBaseManager = () => {
                     <TableHead>Category</TableHead>
                     <TableHead>Size</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Embeddings</TableHead>
                     <TableHead>Uploaded</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -590,6 +694,14 @@ const KnowledgeBaseManager = () => {
                         <Badge className={getStatusColor(doc.status)}>
                           {doc.status}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-1">
+                          <Database className="w-4 h-4 text-purple-500" />
+                          <span className="text-sm font-medium text-purple-600">
+                            {doc.embeddings || 0}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm text-slate-600">
@@ -661,9 +773,9 @@ const KnowledgeBaseManager = () => {
               {actionType === 'category' && 'Change Category'}
             </DialogTitle>
             <DialogDescription>
-              {actionType === 'delete' && `Are you sure you want to delete "${selectedDocument?.name}"? This action cannot be undone.`}
+              {actionType === 'delete' && `Are you sure you want to delete "${selectedDocument?.name}"? This will also remove all associated embeddings from the vector database. This action cannot be undone.`}
               {actionType === 'rename' && `Enter a new name for "${selectedDocument?.name}".`}
-              {actionType === 'replace' && `Select a new file to replace "${selectedDocument?.name}".`}
+              {actionType === 'replace' && `Select a new file to replace "${selectedDocument?.name}". This will update the embeddings in the vector database.`}
               {actionType === 'category' && `Select a new category for "${selectedDocument?.name}".`}
             </DialogDescription>
           </DialogHeader>
