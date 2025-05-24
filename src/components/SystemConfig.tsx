@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Settings, Mail, Shield, Palette, Database, Users } from 'lucide-react';
+import { Settings, Mail, Shield, Brain } from 'lucide-react';
 
 const SystemConfig = () => {
   const { toast } = useToast();
@@ -46,13 +45,16 @@ const SystemConfig = () => {
     ipWhitelist: '',
   });
 
-  // Appearance Settings State
-  const [appearanceSettings, setAppearanceSettings] = useState({
-    theme: 'light',
-    primaryColor: '#3b82f6',
-    logoUrl: '',
-    faviconUrl: '',
-    customCSS: '',
+  // LLM Settings State
+  const [llmSettings, setLlmSettings] = useState({
+    temperature: '0.7',
+    maxTokens: '2048',
+    model: 'gpt-4o-mini',
+    systemPrompt: '',
+    enableStreaming: true,
+    topP: '0.9',
+    frequencyPenalty: '0',
+    presencePenalty: '0',
   });
 
   const handleSaveGeneral = () => {
@@ -77,10 +79,10 @@ const SystemConfig = () => {
     });
   };
 
-  const handleSaveAppearance = () => {
+  const handleSaveLLM = () => {
     toast({
       title: "Success",
-      description: "Appearance settings saved successfully",
+      description: "LLM settings saved successfully",
     });
   };
 
@@ -105,9 +107,9 @@ const SystemConfig = () => {
             <Shield className="h-4 w-4" />
             <span>Security</span>
           </TabsTrigger>
-          <TabsTrigger value="appearance" className="flex items-center space-x-2">
-            <Palette className="h-4 w-4" />
-            <span>Appearance</span>
+          <TabsTrigger value="llm" className="flex items-center space-x-2">
+            <Brain className="h-4 w-4" />
+            <span>LLM</span>
           </TabsTrigger>
         </TabsList>
 
@@ -365,72 +367,116 @@ const SystemConfig = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="appearance">
+        <TabsContent value="llm">
           <Card>
             <CardHeader>
-              <CardTitle>Appearance Settings</CardTitle>
-              <CardDescription>Customize the look and feel of your application</CardDescription>
+              <CardTitle>LLM Configuration</CardTitle>
+              <CardDescription>Configure AI model settings and parameters</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="theme">Theme</Label>
-                  <Select value={appearanceSettings.theme} onValueChange={(value) => setAppearanceSettings({...appearanceSettings, theme: value})}>
+                  <Label htmlFor="model">Model</Label>
+                  <Select value={llmSettings.model} onValueChange={(value) => setLlmSettings({...llmSettings, model: value})}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="light">Light</SelectItem>
-                      <SelectItem value="dark">Dark</SelectItem>
-                      <SelectItem value="auto">Auto</SelectItem>
+                      <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
+                      <SelectItem value="gpt-4o">GPT-4o</SelectItem>
+                      <SelectItem value="gpt-4.5-preview">GPT-4.5 Preview</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="primaryColor">Primary Color</Label>
+                  <Label htmlFor="temperature">Temperature (0.0 - 2.0)</Label>
                   <Input
-                    id="primaryColor"
-                    type="color"
-                    value={appearanceSettings.primaryColor}
-                    onChange={(e) => setAppearanceSettings({...appearanceSettings, primaryColor: e.target.value})}
+                    id="temperature"
+                    type="number"
+                    min="0"
+                    max="2"
+                    step="0.1"
+                    value={llmSettings.temperature}
+                    onChange={(e) => setLlmSettings({...llmSettings, temperature: e.target.value})}
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="logoUrl">Logo URL</Label>
+                  <Label htmlFor="maxTokens">Max Tokens</Label>
                   <Input
-                    id="logoUrl"
-                    placeholder="https://example.com/logo.png"
-                    value={appearanceSettings.logoUrl}
-                    onChange={(e) => setAppearanceSettings({...appearanceSettings, logoUrl: e.target.value})}
+                    id="maxTokens"
+                    type="number"
+                    min="1"
+                    max="4096"
+                    value={llmSettings.maxTokens}
+                    onChange={(e) => setLlmSettings({...llmSettings, maxTokens: e.target.value})}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="faviconUrl">Favicon URL</Label>
+                  <Label htmlFor="topP">Top P (0.0 - 1.0)</Label>
                   <Input
-                    id="faviconUrl"
-                    placeholder="https://example.com/favicon.ico"
-                    value={appearanceSettings.faviconUrl}
-                    onChange={(e) => setAppearanceSettings({...appearanceSettings, faviconUrl: e.target.value})}
+                    id="topP"
+                    type="number"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={llmSettings.topP}
+                    onChange={(e) => setLlmSettings({...llmSettings, topP: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="frequencyPenalty">Frequency Penalty (-2.0 to 2.0)</Label>
+                  <Input
+                    id="frequencyPenalty"
+                    type="number"
+                    min="-2"
+                    max="2"
+                    step="0.1"
+                    value={llmSettings.frequencyPenalty}
+                    onChange={(e) => setLlmSettings({...llmSettings, frequencyPenalty: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="presencePenalty">Presence Penalty (-2.0 to 2.0)</Label>
+                  <Input
+                    id="presencePenalty"
+                    type="number"
+                    min="-2"
+                    max="2"
+                    step="0.1"
+                    value={llmSettings.presencePenalty}
+                    onChange={(e) => setLlmSettings({...llmSettings, presencePenalty: e.target.value})}
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="customCSS">Custom CSS</Label>
+                <Label htmlFor="systemPrompt">System Prompt</Label>
                 <Textarea
-                  id="customCSS"
-                  placeholder="/* Custom CSS styles */"
-                  value={appearanceSettings.customCSS}
-                  onChange={(e) => setAppearanceSettings({...appearanceSettings, customCSS: e.target.value})}
-                  rows={6}
+                  id="systemPrompt"
+                  placeholder="Enter the system prompt that will be used for AI responses..."
+                  value={llmSettings.systemPrompt}
+                  onChange={(e) => setLlmSettings({...llmSettings, systemPrompt: e.target.value})}
+                  rows={4}
                 />
               </div>
 
-              <Button onClick={handleSaveAppearance} className="w-full">
-                Save Appearance Settings
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="enableStreaming"
+                  checked={llmSettings.enableStreaming}
+                  onCheckedChange={(checked) => setLlmSettings({...llmSettings, enableStreaming: checked})}
+                />
+                <Label htmlFor="enableStreaming">Enable Response Streaming</Label>
+              </div>
+
+              <Button onClick={handleSaveLLM} className="w-full">
+                Save LLM Settings
               </Button>
             </CardContent>
           </Card>
