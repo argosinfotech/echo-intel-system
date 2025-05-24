@@ -56,6 +56,11 @@ const SystemConfig = () => {
     topP: '0.9',
     frequencyPenalty: '0',
     presencePenalty: '0',
+    // Chat Limitations
+    enableChatLimits: false,
+    dailyMessageLimit: '100',
+    hourlyMessageLimit: '20',
+    limitResetTime: '00:00',
   });
 
   const handleSaveGeneral = () => {
@@ -369,129 +374,185 @@ const SystemConfig = () => {
         </TabsContent>
 
         <TabsContent value="llm">
-          <Card>
-            <CardHeader>
-              <CardTitle>LLM Configuration</CardTitle>
-              <CardDescription>Configure AI model settings and parameters</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="model">Model</Label>
-                  <Select value={llmSettings.model} onValueChange={(value) => setLlmSettings({...llmSettings, model: value})}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
-                      <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                      <SelectItem value="gpt-4.5-preview">GPT-4.5 Preview</SelectItem>
-                    </SelectContent>
-                  </Select>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>LLM Configuration</CardTitle>
+                <CardDescription>Configure AI model settings and parameters</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="model">Model</Label>
+                    <Select value={llmSettings.model} onValueChange={(value) => setLlmSettings({...llmSettings, model: value})}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
+                        <SelectItem value="gpt-4o">GPT-4o</SelectItem>
+                        <SelectItem value="gpt-4.5-preview">GPT-4.5 Preview</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="temperature">Temperature (0.0 - 2.0)</Label>
+                    <Input
+                      id="temperature"
+                      type="number"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={llmSettings.temperature}
+                      onChange={(e) => setLlmSettings({...llmSettings, temperature: e.target.value})}
+                    />
+                  </div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="maxTokens">Max Tokens</Label>
+                    <Input
+                      id="maxTokens"
+                      type="number"
+                      min="1"
+                      max="4096"
+                      value={llmSettings.maxTokens}
+                      onChange={(e) => setLlmSettings({...llmSettings, maxTokens: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="topP">Top P (0.0 - 1.0)</Label>
+                    <Input
+                      id="topP"
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={llmSettings.topP}
+                      onChange={(e) => setLlmSettings({...llmSettings, topP: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="frequencyPenalty">Frequency Penalty (-2.0 to 2.0)</Label>
+                    <Input
+                      id="frequencyPenalty"
+                      type="number"
+                      min="-2"
+                      max="2"
+                      step="0.1"
+                      value={llmSettings.frequencyPenalty}
+                      onChange={(e) => setLlmSettings({...llmSettings, frequencyPenalty: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="presencePenalty">Presence Penalty (-2.0 to 2.0)</Label>
+                    <Input
+                      id="presencePenalty"
+                      type="number"
+                      min="-2"
+                      max="2"
+                      step="0.1"
+                      value={llmSettings.presencePenalty}
+                      onChange={(e) => setLlmSettings({...llmSettings, presencePenalty: e.target.value})}
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="temperature">Temperature (0.0 - 2.0)</Label>
-                  <Input
-                    id="temperature"
-                    type="number"
-                    min="0"
-                    max="2"
-                    step="0.1"
-                    value={llmSettings.temperature}
-                    onChange={(e) => setLlmSettings({...llmSettings, temperature: e.target.value})}
+                  <Label htmlFor="systemPrompt">System Prompt</Label>
+                  <Textarea
+                    id="systemPrompt"
+                    placeholder="Enter the system prompt that will be used for AI responses..."
+                    value={llmSettings.systemPrompt}
+                    onChange={(e) => setLlmSettings({...llmSettings, systemPrompt: e.target.value})}
+                    rows={4}
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="maxTokens">Max Tokens</Label>
-                  <Input
-                    id="maxTokens"
-                    type="number"
-                    min="1"
-                    max="4096"
-                    value={llmSettings.maxTokens}
-                    onChange={(e) => setLlmSettings({...llmSettings, maxTokens: e.target.value})}
+                  <Label htmlFor="botInstructions">Bot Instructions</Label>
+                  <Textarea
+                    id="botInstructions"
+                    placeholder="Enter specific instructions for how the bot should behave and respond..."
+                    value={llmSettings.botInstructions}
+                    onChange={(e) => setLlmSettings({...llmSettings, botInstructions: e.target.value})}
+                    rows={4}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="topP">Top P (0.0 - 1.0)</Label>
-                  <Input
-                    id="topP"
-                    type="number"
-                    min="0"
-                    max="1"
-                    step="0.1"
-                    value={llmSettings.topP}
-                    onChange={(e) => setLlmSettings({...llmSettings, topP: e.target.value})}
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="enableStreaming"
+                    checked={llmSettings.enableStreaming}
+                    onCheckedChange={(checked) => setLlmSettings({...llmSettings, enableStreaming: checked})}
                   />
+                  <Label htmlFor="enableStreaming">Enable Response Streaming</Label>
                 </div>
-              </div>
+              </CardContent>
+            </Card>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="frequencyPenalty">Frequency Penalty (-2.0 to 2.0)</Label>
-                  <Input
-                    id="frequencyPenalty"
-                    type="number"
-                    min="-2"
-                    max="2"
-                    step="0.1"
-                    value={llmSettings.frequencyPenalty}
-                    onChange={(e) => setLlmSettings({...llmSettings, frequencyPenalty: e.target.value})}
+            <Card>
+              <CardHeader>
+                <CardTitle>Chat Limitations</CardTitle>
+                <CardDescription>Set daily/hourly message limits per user</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="enableChatLimits"
+                    checked={llmSettings.enableChatLimits}
+                    onCheckedChange={(checked) => setLlmSettings({...llmSettings, enableChatLimits: checked})}
                   />
+                  <Label htmlFor="enableChatLimits">Enable Chat Limitations</Label>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="presencePenalty">Presence Penalty (-2.0 to 2.0)</Label>
-                  <Input
-                    id="presencePenalty"
-                    type="number"
-                    min="-2"
-                    max="2"
-                    step="0.1"
-                    value={llmSettings.presencePenalty}
-                    onChange={(e) => setLlmSettings({...llmSettings, presencePenalty: e.target.value})}
-                  />
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="systemPrompt">System Prompt</Label>
-                <Textarea
-                  id="systemPrompt"
-                  placeholder="Enter the system prompt that will be used for AI responses..."
-                  value={llmSettings.systemPrompt}
-                  onChange={(e) => setLlmSettings({...llmSettings, systemPrompt: e.target.value})}
-                  rows={4}
-                />
-              </div>
+                {llmSettings.enableChatLimits && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="dailyMessageLimit">Daily Message Limit</Label>
+                        <Input
+                          id="dailyMessageLimit"
+                          type="number"
+                          min="1"
+                          value={llmSettings.dailyMessageLimit}
+                          onChange={(e) => setLlmSettings({...llmSettings, dailyMessageLimit: e.target.value})}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="hourlyMessageLimit">Hourly Message Limit</Label>
+                        <Input
+                          id="hourlyMessageLimit"
+                          type="number"
+                          min="1"
+                          value={llmSettings.hourlyMessageLimit}
+                          onChange={(e) => setLlmSettings({...llmSettings, hourlyMessageLimit: e.target.value})}
+                        />
+                      </div>
+                    </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="botInstructions">Bot Instructions</Label>
-                <Textarea
-                  id="botInstructions"
-                  placeholder="Enter specific instructions for how the bot should behave and respond..."
-                  value={llmSettings.botInstructions}
-                  onChange={(e) => setLlmSettings({...llmSettings, botInstructions: e.target.value})}
-                  rows={4}
-                />
-              </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="limitResetTime">Daily Limit Reset Time</Label>
+                      <Input
+                        id="limitResetTime"
+                        type="time"
+                        value={llmSettings.limitResetTime}
+                        onChange={(e) => setLlmSettings({...llmSettings, limitResetTime: e.target.value})}
+                      />
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
 
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="enableStreaming"
-                  checked={llmSettings.enableStreaming}
-                  onCheckedChange={(checked) => setLlmSettings({...llmSettings, enableStreaming: checked})}
-                />
-                <Label htmlFor="enableStreaming">Enable Response Streaming</Label>
-              </div>
-
-              <Button onClick={handleSaveLLM} className="w-full">
-                Save LLM Settings
-              </Button>
-            </CardContent>
-          </Card>
+            <Button onClick={handleSaveLLM} className="w-full">
+              Save LLM Settings
+            </Button>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
