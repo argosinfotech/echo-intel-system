@@ -4,6 +4,22 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { 
   Upload, 
   FileText, 
@@ -19,7 +35,10 @@ import {
   File,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Pen,
+  RefreshCw,
+  Folder
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -32,12 +51,30 @@ interface UploadFile {
   error?: string;
 }
 
+interface Document {
+  id: number;
+  name: string;
+  category: string;
+  size: string;
+  uploadDate: string;
+  uploadedBy: string;
+  status: 'processed' | 'processing' | 'failed';
+  chunks: number;
+  downloads: number;
+}
+
 const KnowledgeBaseManager = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  const [actionType, setActionType] = useState<'delete' | 'rename' | 'replace' | 'category' | null>(null);
+  const [newFileName, setNewFileName] = useState('');
+  const [newCategory, setNewCategory] = useState('');
+  const [replacementFile, setReplacementFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const replaceFileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const categories = [
@@ -49,7 +86,7 @@ const KnowledgeBaseManager = () => {
     { id: 'technical', name: 'Technical Guides', count: 100 },
   ];
 
-  const documents = [
+  const [documents, setDocuments] = useState<Document[]>([
     {
       id: 1,
       name: 'Customer Service Guidelines.pdf',
@@ -105,7 +142,7 @@ const KnowledgeBaseManager = () => {
       chunks: 0,
       downloads: 0
     }
-  ];
+  ]);
 
   const validateFile = (file: File): string | null => {
     const allowedTypes = [
@@ -241,6 +278,95 @@ const KnowledgeBaseManager = () => {
     setUploadFiles(prev => prev.filter(f => f.id !== id));
   }, []);
 
+  const openActionDialog = (document: Document, action: 'delete' | 'rename' | 'replace' | 'category') => {
+    setSelectedDocument(document);
+    setActionType(action);
+    setNewFileName(document.name);
+    setNewCategory(document.category);
+    setReplacementFile(null);
+  };
+
+  const closeActionDialog = () => {
+    setSelectedDocument(null);
+    setActionType(null);
+    setNewFileName('');
+    setNewCategory('');
+    setReplacementFile(null);
+  };
+
+  const handleDeleteDocument = () => {
+    if (selectedDocument) {
+      setDocuments(prev => prev.filter(doc => doc.id !== selectedDocument.id));
+      toast({
+        title: "Document deleted",
+        description: `${selectedDocument.name} has been removed from the knowledge base.`,
+      });
+      closeActionDialog();
+    }
+  };
+
+  const handleRenameDocument = () => {
+    if (selectedDocument && newFileName.trim()) {
+      setDocuments(prev => prev.map(doc => 
+        doc.id === selectedDocument.id ? { ...doc, name: newFileName.trim() } : doc
+      ));
+      toast({
+        title: "Document renamed",
+        description: `Document has been renamed to ${newFileName.trim()}.`,
+      });
+      closeActionDialog();
+    }
+  };
+
+  const handleChangeCategory = () => {
+    if (selectedDocument && newCategory.trim()) {
+      setDocuments(prev => prev.map(doc => 
+        doc.id === selectedDocument.id ? { ...doc, category: newCategory } : doc
+      ));
+      toast({
+        title: "Category updated",
+        description: `Document category has been changed to ${newCategory}.`,
+      });
+      closeActionDialog();
+    }
+  };
+
+  const handleReplaceFile = () => {
+    if (selectedDocument && replacementFile) {
+      const error = validateFile(replacementFile);
+      if (error) {
+        toast({
+          title: "Invalid file",
+          description: error,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setDocuments(prev => prev.map(doc => 
+        doc.id === selectedDocument.id ? { 
+          ...doc, 
+          name: replacementFile.name,
+          size: `${(replacementFile.size / 1024 / 1024).toFixed(1)} MB`,
+          status: 'processing' as const,
+          uploadDate: new Date().toISOString().split('T')[0]
+        } : doc
+      ));
+      
+      toast({
+        title: "File replaced",
+        description: `${selectedDocument.name} has been replaced with ${replacementFile.name}.`,
+      });
+      closeActionDialog();
+    }
+  };
+
+  const handleReplaceFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setReplacementFile(e.target.files[0]);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'processed': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
@@ -359,7 +485,7 @@ const KnowledgeBaseManager = () => {
         </CardContent>
       </Card>
 
-      {/* Categories and Search */}
+      {/* Categories and Documents List */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Categories Sidebar */}
         <Card className="bg-white/60 backdrop-blur-sm border-0 shadow-lg">
@@ -420,77 +546,199 @@ const KnowledgeBaseManager = () => {
             </CardContent>
           </Card>
 
-          {/* Documents Grid */}
-          <div className="grid gap-4">
-            {documents.map((doc) => (
-              <Card key={doc.id} className="bg-white/60 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-200">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-4 flex-1">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                        <FileText className="w-6 h-6 text-white" />
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-semibold text-slate-800 truncate">{doc.name}</h3>
-                        <div className="flex items-center space-x-4 mt-2 text-sm text-slate-600">
-                          <span className="flex items-center">
-                            <Badge variant="outline">{doc.category}</Badge>
-                          </span>
-                          <span className="flex items-center">
-                            <File className="w-4 h-4 mr-1" />
-                            {doc.size}
-                          </span>
-                          <span className="flex items-center">
+          {/* Documents Table */}
+          <Card className="bg-white/60 backdrop-blur-sm border-0 shadow-lg">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Document</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Size</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Uploaded</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {documents.map((doc) => (
+                    <TableRow key={doc.id}>
+                      <TableCell>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded flex items-center justify-center">
+                            <FileText className="w-4 h-4 text-white" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-slate-800">{doc.name}</p>
+                            <p className="text-sm text-slate-500">{doc.chunks} chunks • {doc.downloads} downloads</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{doc.category}</Badge>
+                      </TableCell>
+                      <TableCell className="text-slate-600">{doc.size}</TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(doc.status)}>
+                          {doc.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm text-slate-600">
+                          <div className="flex items-center">
                             <Calendar className="w-4 h-4 mr-1" />
                             {doc.uploadDate}
-                          </span>
-                          <span className="flex items-center">
+                          </div>
+                          <div className="flex items-center mt-1">
                             <User className="w-4 h-4 mr-1" />
                             {doc.uploadedBy}
-                          </span>
+                          </div>
                         </div>
-                        
-                        <div className="flex items-center space-x-4 mt-3">
-                          <Badge className={getStatusColor(doc.status)}>
-                            {doc.status}
-                          </Badge>
-                          <span className="text-sm text-slate-500">
-                            {doc.chunks} chunks • {doc.downloads} downloads
-                          </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Button size="sm" variant="outline">
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button size="sm" variant="outline">
+                            <Download className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => openActionDialog(doc, 'rename')}
+                          >
+                            <Pen className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => openActionDialog(doc, 'replace')}
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => openActionDialog(doc, 'category')}
+                          >
+                            <Folder className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => openActionDialog(doc, 'delete')}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      <Button size="sm" variant="outline">
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button size="sm" variant="outline">
-                        <Download className="w-4 h-4" />
-                      </Button>
-                      <Button size="sm" variant="outline">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          {/* Pagination */}
-          <div className="flex justify-center">
-            <div className="flex space-x-2">
-              <Button variant="outline" size="sm">Previous</Button>
-              <Button size="sm" className="bg-blue-500 text-white">1</Button>
-              <Button variant="outline" size="sm">2</Button>
-              <Button variant="outline" size="sm">3</Button>
-              <Button variant="outline" size="sm">Next</Button>
-            </div>
-          </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </div>
       </div>
+
+      {/* Action Dialogs */}
+      <Dialog open={actionType !== null} onOpenChange={closeActionDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {actionType === 'delete' && 'Delete Document'}
+              {actionType === 'rename' && 'Rename Document'}
+              {actionType === 'replace' && 'Replace Document'}
+              {actionType === 'category' && 'Change Category'}
+            </DialogTitle>
+            <DialogDescription>
+              {actionType === 'delete' && `Are you sure you want to delete "${selectedDocument?.name}"? This action cannot be undone.`}
+              {actionType === 'rename' && `Enter a new name for "${selectedDocument?.name}".`}
+              {actionType === 'replace' && `Select a new file to replace "${selectedDocument?.name}".`}
+              {actionType === 'category' && `Select a new category for "${selectedDocument?.name}".`}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {actionType === 'rename' && (
+            <div className="py-4">
+              <Input
+                value={newFileName}
+                onChange={(e) => setNewFileName(e.target.value)}
+                placeholder="Enter new file name"
+              />
+            </div>
+          )}
+
+          {actionType === 'replace' && (
+            <div className="py-4">
+              <div className="space-y-4">
+                <Button
+                  variant="outline"
+                  onClick={() => replaceFileInputRef.current?.click()}
+                  className="w-full"
+                >
+                  {replacementFile ? replacementFile.name : 'Select Replacement File'}
+                </Button>
+                <input
+                  ref={replaceFileInputRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx,.txt,.md"
+                  onChange={handleReplaceFileSelect}
+                  className="hidden"
+                />
+                {replacementFile && (
+                  <p className="text-sm text-slate-600">
+                    Size: {(replacementFile.size / 1024 / 1024).toFixed(1)} MB
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {actionType === 'category' && (
+            <div className="py-4">
+              <select
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                className="w-full p-2 border rounded-md bg-white"
+              >
+                {categories.slice(1).map((category) => (
+                  <option key={category.id} value={category.name}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeActionDialog}>
+              Cancel
+            </Button>
+            {actionType === 'delete' && (
+              <Button variant="destructive" onClick={handleDeleteDocument}>
+                Delete
+              </Button>
+            )}
+            {actionType === 'rename' && (
+              <Button onClick={handleRenameDocument} disabled={!newFileName.trim()}>
+                Rename
+              </Button>
+            )}
+            {actionType === 'replace' && (
+              <Button onClick={handleReplaceFile} disabled={!replacementFile}>
+                Replace
+              </Button>
+            )}
+            {actionType === 'category' && (
+              <Button onClick={handleChangeCategory}>
+                Update Category
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
