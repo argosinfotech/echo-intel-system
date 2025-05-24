@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { 
   Upload, 
   FileText, 
@@ -15,15 +16,29 @@ import {
   FolderPlus,
   Calendar,
   User,
-  File
+  File,
+  CheckCircle,
+  XCircle,
+  AlertCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+
+interface UploadFile {
+  id: string;
+  file: File;
+  progress: number;
+  status: 'uploading' | 'processing' | 'completed' | 'error';
+  error?: string;
+}
 
 const KnowledgeBaseManager = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
+  const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   const categories = [
     { id: 'all', name: 'All Categories', count: 1234 },
@@ -92,22 +107,139 @@ const KnowledgeBaseManager = () => {
     }
   ];
 
-  const handleFileUpload = () => {
-    setIsUploading(true);
-    setUploadProgress(0);
+  const validateFile = (file: File): string | null => {
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      'text/markdown'
+    ];
     
-    // Simulate upload progress
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsUploading(false);
-          return 100;
-        }
-        return prev + 10;
-      });
-    }, 200);
+    const allowedExtensions = ['.pdf', '.doc', '.docx', '.txt', '.md'];
+    const maxSize = 50 * 1024 * 1024; // 50MB
+
+    if (!allowedTypes.includes(file.type) && !allowedExtensions.some(ext => file.name.toLowerCase().endsWith(ext))) {
+      return 'File type not supported. Please upload PDF, DOC, DOCX, TXT, or MD files.';
+    }
+
+    if (file.size > maxSize) {
+      return 'File size too large. Maximum size is 50MB.';
+    }
+
+    return null;
   };
+
+  const simulateFileUpload = useCallback(async (uploadFile: UploadFile) => {
+    try {
+      // Simulate upload progress
+      for (let progress = 0; progress <= 100; progress += 10) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        setUploadFiles(prev => prev.map(f => 
+          f.id === uploadFile.id ? { ...f, progress } : f
+        ));
+      }
+
+      // Simulate processing
+      setUploadFiles(prev => prev.map(f => 
+        f.id === uploadFile.id ? { ...f, status: 'processing' } : f
+      ));
+
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Complete
+      setUploadFiles(prev => prev.map(f => 
+        f.id === uploadFile.id ? { ...f, status: 'completed' } : f
+      ));
+
+      toast({
+        title: "Upload successful",
+        description: `${uploadFile.file.name} has been processed and added to the knowledge base.`,
+      });
+
+    } catch (error) {
+      setUploadFiles(prev => prev.map(f => 
+        f.id === uploadFile.id ? { 
+          ...f, 
+          status: 'error', 
+          error: 'Upload failed. Please try again.' 
+        } : f
+      ));
+
+      toast({
+        title: "Upload failed",
+        description: `Failed to upload ${uploadFile.file.name}. Please try again.`,
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
+  const handleFileSelect = useCallback((files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    const newUploadFiles: UploadFile[] = [];
+
+    fileArray.forEach(file => {
+      const error = validateFile(file);
+      if (error) {
+        toast({
+          title: "Invalid file",
+          description: error,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const uploadFile: UploadFile = {
+        id: Math.random().toString(36).substr(2, 9),
+        file,
+        progress: 0,
+        status: 'uploading'
+      };
+
+      newUploadFiles.push(uploadFile);
+    });
+
+    if (newUploadFiles.length > 0) {
+      setUploadFiles(prev => [...prev, ...newUploadFiles]);
+      newUploadFiles.forEach(uploadFile => {
+        simulateFileUpload(uploadFile);
+      });
+    }
+  }, [toast, simulateFileUpload]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      handleFileSelect(files);
+    }
+  }, [handleFileSelect]);
+
+  const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleFileSelect(e.target.files);
+    }
+  }, [handleFileSelect]);
+
+  const clearCompletedUploads = useCallback(() => {
+    setUploadFiles(prev => prev.filter(f => f.status !== 'completed'));
+  }, []);
+
+  const removeUpload = useCallback((id: string) => {
+    setUploadFiles(prev => prev.filter(f => f.id !== id));
+  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -118,47 +250,112 @@ const KnowledgeBaseManager = () => {
     }
   };
 
+  const getUploadStatusIcon = (status: UploadFile['status']) => {
+    switch (status) {
+      case 'completed': return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'error': return <XCircle className="w-4 h-4 text-red-500" />;
+      case 'processing': return <AlertCircle className="w-4 h-4 text-blue-500" />;
+      default: return <Upload className="w-4 h-4 text-gray-500" />;
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* Upload Section */}
       <Card className="bg-white/60 backdrop-blur-sm border-0 shadow-lg">
         <CardHeader>
-          <CardTitle className="flex items-center text-slate-800">
-            <Upload className="w-5 h-5 mr-2 text-blue-500" />
-            Document Upload
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center text-slate-800">
+              <Upload className="w-5 h-5 mr-2 text-blue-500" />
+              Document Upload
+            </CardTitle>
+            {uploadFiles.length > 0 && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={clearCompletedUploads}
+              >
+                Clear Completed
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center bg-blue-50/30">
+          <div 
+            className={cn(
+              "border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200",
+              isDragOver 
+                ? "border-blue-500 bg-blue-50/50" 
+                : "border-blue-300 bg-blue-50/30"
+            )}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
             <Upload className="w-12 h-12 text-blue-500 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-slate-800 mb-2">Upload Knowledge Base Documents</h3>
             <p className="text-slate-600 mb-4">Drag and drop files here, or click to browse</p>
             <p className="text-sm text-slate-500 mb-4">Supports PDF, DOC, DOCX, TXT, MD files up to 50MB</p>
             
-            {isUploading ? (
-              <div className="space-y-3">
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${uploadProgress}%` }}
-                  />
-                </div>
-                <p className="text-sm text-slate-600">Uploading... {uploadProgress}%</p>
-              </div>
-            ) : (
-              <div className="space-x-4">
-                <Button 
-                  onClick={handleFileUpload}
-                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
-                >
-                  Select Files
-                </Button>
-                <Button variant="outline">
-                  Bulk Upload
-                </Button>
-              </div>
-            )}
+            <div className="space-x-4">
+              <Button 
+                onClick={() => fileInputRef.current?.click()}
+                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+              >
+                Select Files
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                Bulk Upload
+              </Button>
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.doc,.docx,.txt,.md"
+              onChange={handleFileInputChange}
+              className="hidden"
+            />
           </div>
+
+          {/* Upload Progress */}
+          {uploadFiles.length > 0 && (
+            <div className="mt-6 space-y-3">
+              <h4 className="text-sm font-medium text-slate-700">Upload Progress</h4>
+              {uploadFiles.map((uploadFile) => (
+                <div key={uploadFile.id} className="flex items-center space-x-3 p-3 bg-white/80 rounded-lg border">
+                  {getUploadStatusIcon(uploadFile.status)}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">
+                      {uploadFile.file.name}
+                    </p>
+                    <div className="flex items-center space-x-2 mt-1">
+                      {uploadFile.status === 'uploading' && (
+                        <Progress value={uploadFile.progress} className="h-2 flex-1" />
+                      )}
+                      <span className="text-xs text-slate-500">
+                        {uploadFile.status === 'uploading' && `${uploadFile.progress}%`}
+                        {uploadFile.status === 'processing' && 'Processing...'}
+                        {uploadFile.status === 'completed' && 'Completed'}
+                        {uploadFile.status === 'error' && uploadFile.error}
+                      </span>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => removeUpload(uploadFile.id)}
+                  >
+                    <XCircle className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
