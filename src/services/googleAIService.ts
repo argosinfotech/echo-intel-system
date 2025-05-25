@@ -6,10 +6,14 @@ interface GoogleAIEmbeddingResponse {
 }
 
 class GoogleAIService {
-  private apiKey: string;
+  private apiKey: string | null = null;
   private baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
 
-  constructor() {
+  private initializeAPIKey(): string {
+    if (this.apiKey) {
+      return this.apiKey;
+    }
+
     const apiKey = import.meta.env.VITE_GOOGLE_AI_API_KEY;
     
     if (!apiKey) {
@@ -20,14 +24,16 @@ class GoogleAIService {
     }
     
     this.apiKey = apiKey;
+    return this.apiKey;
   }
 
   async generateEmbedding(text: string): Promise<number[]> {
     try {
+      const apiKey = this.initializeAPIKey();
       console.log('Generating embedding with Google AI for text:', text.substring(0, 100) + '...');
       
       const response = await fetch(
-        `${this.baseUrl}/models/embedding-001:embedContent?key=${this.apiKey}`,
+        `${this.baseUrl}/models/embedding-001:embedContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: {
@@ -59,10 +65,11 @@ class GoogleAIService {
 
   async generateResponse(query: string, context: string): Promise<string> {
     try {
+      const apiKey = this.initializeAPIKey();
       console.log('Generating AI response with Google AI');
       
       const response = await fetch(
-        `${this.baseUrl}/models/gemini-pro:generateContent?key=${this.apiKey}`,
+        `${this.baseUrl}/models/gemini-pro:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: {
