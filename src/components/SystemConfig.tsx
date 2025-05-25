@@ -56,7 +56,7 @@ const SystemConfig = () => {
     // Model Settings
     temperature: '0.7',
     maxTokens: '2048',
-    model: 'gpt-4o-mini',
+    model: 'gemini-1.5-flash',
     systemPrompt: '',
     botInstructions: '',
     enableStreaming: true,

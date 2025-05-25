@@ -89,15 +89,16 @@ const LLMSettings = ({ settings, onSettingsChange }: LLMSettingsProps) => {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="model">Model</Label>
+              <Label htmlFor="model">Gemini Model</Label>
               <Select value={settings.model} onValueChange={(value) => onSettingsChange({...settings, model: value})}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
-                  <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                  <SelectItem value="gpt-4.5-preview">GPT-4.5 Preview</SelectItem>
+                  <SelectItem value="gemini-pro">Gemini Pro</SelectItem>
+                  <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro</SelectItem>
+                  <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash</SelectItem>
+                  <SelectItem value="gemini-1.0-pro">Gemini 1.0 Pro</SelectItem>
                 </SelectContent>
               </Select>
             </div>
