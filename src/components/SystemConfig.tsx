@@ -48,6 +48,12 @@ const SystemConfig = () => {
 
   // LLM Settings State
   const [llmSettings, setLlmSettings] = useState<LLMSettingsType>({
+    // API Configuration
+    googleAIApiKey: '',
+    pineconeApiKey: '',
+    pineconeIndexName: 'knowledge-base',
+    
+    // Model Settings
     temperature: '0.7',
     maxTokens: '2048',
     model: 'gpt-4o-mini',
@@ -57,6 +63,8 @@ const SystemConfig = () => {
     topP: '0.9',
     frequencyPenalty: '0',
     presencePenalty: '0',
+    
+    // Rate Limiting
     enableChatLimits: false,
     dailyMessageLimit: '100',
     hourlyMessageLimit: '20',

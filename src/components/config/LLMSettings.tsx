@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { LLMSettings as LLMSettingsType } from '@/types/config';
+import { Key, Database } from 'lucide-react';
 
 interface LLMSettingsProps {
   settings: LLMSettingsType;
@@ -29,7 +30,60 @@ const LLMSettings = ({ settings, onSettingsChange }: LLMSettingsProps) => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>LLM Configuration</CardTitle>
+          <CardTitle className="flex items-center space-x-2">
+            <Key className="h-5 w-5" />
+            <span>API Configuration</span>
+          </CardTitle>
+          <CardDescription>Configure API keys and endpoints for AI services</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="googleAIApiKey">Google AI API Key</Label>
+            <Input
+              id="googleAIApiKey"
+              type="password"
+              placeholder="Enter your Google AI API key..."
+              value={settings.googleAIApiKey}
+              onChange={(e) => onSettingsChange({...settings, googleAIApiKey: e.target.value})}
+            />
+            <p className="text-sm text-muted-foreground">
+              Get your API key from <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Google AI Studio</a>
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="pineconeApiKey">Pinecone API Key</Label>
+              <Input
+                id="pineconeApiKey"
+                type="password"
+                placeholder="Enter your Pinecone API key..."
+                value={settings.pineconeApiKey}
+                onChange={(e) => onSettingsChange({...settings, pineconeApiKey: e.target.value})}
+              />
+              <p className="text-sm text-muted-foreground">
+                Get your API key from <a href="https://app.pinecone.io" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Pinecone Console</a>
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pineconeIndexName">Pinecone Index Name</Label>
+              <Input
+                id="pineconeIndexName"
+                placeholder="knowledge-base"
+                value={settings.pineconeIndexName}
+                onChange={(e) => onSettingsChange({...settings, pineconeIndexName: e.target.value})}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Database className="h-5 w-5" />
+            <span>Model Configuration</span>
+          </CardTitle>
           <CardDescription>Configure AI model settings and parameters</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

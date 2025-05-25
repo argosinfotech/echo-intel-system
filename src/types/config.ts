@@ -29,6 +29,12 @@ export interface SecuritySettings {
 }
 
 export interface LLMSettings {
+  // API Configuration
+  googleAIApiKey: string;
+  pineconeApiKey: string;
+  pineconeIndexName: string;
+  
+  // Model Settings
   temperature: string;
   maxTokens: string;
   model: string;
@@ -38,6 +44,8 @@ export interface LLMSettings {
   topP: string;
   frequencyPenalty: string;
   presencePenalty: string;
+  
+  // Rate Limiting
   enableChatLimits: boolean;
   dailyMessageLimit: string;
   hourlyMessageLimit: string;
