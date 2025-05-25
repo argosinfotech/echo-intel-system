@@ -1,10 +1,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User } from 'lucide-react';
+import { Send, Bot, User, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import LoginScreen from '@/components/LoginScreen';
 
 interface Message {
   id: string;
@@ -13,7 +14,14 @@ interface Message {
   timestamp: Date;
 }
 
+interface User {
+  email: string;
+  name: string;
+}
+
 const ChatInterface = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -38,6 +46,32 @@ const ChatInterface = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const handleLogin = (userData: User) => {
+    setUser(userData);
+    setIsAuthenticated(true);
+    // Add welcome message
+    const welcomeMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      content: `Welcome back, ${userData.name}! How can I assist you today?`,
+      sender: 'bot',
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, welcomeMessage]);
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setUser(null);
+    setMessages([
+      {
+        id: '1',
+        content: 'Hello! I\'m your AI assistant. How can I help you today?',
+        sender: 'bot',
+        timestamp: new Date(),
+      }
+    ]);
+  };
 
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
@@ -72,12 +106,30 @@ const ChatInterface = () => {
     }
   };
 
+  if (!isAuthenticated) {
+    return <LoginScreen onLogin={handleLogin} />;
+  }
+
   return (
     <Card className="flex flex-col h-[600px]">
       <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <Bot className="h-5 w-5" />
-          <span>AI Chat Assistant</span>
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Bot className="h-5 w-5" />
+            <span>AI Chat Assistant</span>
+          </div>
+          <div className="flex items-center space-x-3">
+            <span className="text-sm text-gray-600">Welcome, {user?.name}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleLogout}
+              className="text-gray-600"
+            >
+              <LogOut className="h-4 w-4 mr-1" />
+              Logout
+            </Button>
+          </div>
         </CardTitle>
       </CardHeader>
       
